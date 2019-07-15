@@ -1,5 +1,7 @@
 # satellite6-aws-demo
-Set of AWS CloudFormation templates and [Ansible](https://www.redhat.com/en/technologies/management/ansible) playbooks for creating a [Red Hat Satellite 6](https://www.redhat.com/en/technologies/management/satellite) Demo Environment on AWS. Can be used for Satellite 6 demonstation purposes or as a foundation for more complex Satellite 6 architectures on AWS. **Not suitable** for production depoyments without applying additional security controls.
+Set of AWS CloudFormation templates and [Ansible](https://www.redhat.com/en/technologies/management/ansible) playbooks for creating a [Red Hat Satellite 6](https://www.redhat.com/en/technologies/management/satellite) Demo Environment on AWS. Can be used for Satellite 6 demonstation purposes or as a foundation for more complex Satellite 6 architectures on AWS. 
+
+**Not suitable for production deployments without applying additional security controls and configuration.***
 
 ## List of Satellite 6.5 demos
  - 1x Satellite, 3 additional subnets, 3x capsules, 1 Organization and 4 Locations
@@ -23,3 +25,6 @@ Set of AWS CloudFormation templates and [Ansible](https://www.redhat.com/en/tech
 ## How to get access
 
 ## How to remove it from AWS
+```
+# aws cloudformation delete-stack --stack-name SATELLITE6DEMO
+```

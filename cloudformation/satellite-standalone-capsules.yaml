@@ -436,7 +436,7 @@ Resources:
           mkdir -p /root/infra/{playbooks,roles}
           cd /root/infra
           git clone https://github.com/theforeman/foreman-ansible-modules.git
-          wget https://raw.githubusercontent.com/amasolov/satellite6-aws-demo/master/playbooks/satellite6-aws-demo.yml
+          wget https://raw.githubusercontent.com/amasolov/satellite6-aws-demo/master/playbooks/satellite6-aws-demo.yml -O foreman.yml
           cat << EOF > /root/infra/ansible.cfg
           [defaults]
           library = foreman-ansible-modules/plugins/modules
