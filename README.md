@@ -12,10 +12,14 @@ Set of AWS CloudFormation templates and [Ansible](https://www.redhat.com/en/tech
  - Active Red Hat subscription for Red Hat Satellite 6 itself and Red Hat Enterprise Linux VMs
  - [aws-cli](https://github.com/aws/aws-cli) installed and configured OR use AWS CloudFormation WebUI to create stacks
  - Not using Elastic IPs so don't expect it to work flawlessly after rebooting
+ - At least one SSH key is added to your AWS acccount
 ## Installation and configuration
 
 You can use AWS CloudFormation Web Console to create stacks by uploading the template. In case of using aws-cli, create a file with parameters as in [satellite6-aws-demo-parameters.json](https://github.com/amasolov/satellite6-aws-demo/blob/master/cloudformation/satellite6-aws-demo-parameters.json)
 
+Included [Ansible playbook](https://github.com/amasolov/satellite6-aws-demo/blob/master/playbooks/satellite6-aws-demo.yml) uses [foreman-ansible-modules](https://github.com/theforeman/foreman-ansible-modules) to manage Satellite content like manifest, subscriptions, repositories and etc. 
+
+Make sure that selected EC2 instance types are available in your region/AZ.
 ```
 # cat satellite6-aws-demo-parameters.json
 [
@@ -80,16 +84,28 @@ You can use AWS CloudFormation Web Console to create stacks by uploading the tem
 ## How to get access
 
 ```
-### Wait till your demo stack is ready
+### Wait till your demo stack is ready. It should take about 1 hour.
 # aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE
 
 ### Get information about your stack. It should contain a public Satellite hostname
 # aws cloudformation describe-stacks --stack-name SATELLITE6DEMO
+...
+            "StackStatus": "CREATE_COMPLETE",
+            "DisableRollback": false,
+            "NotificationARNs": [],
+            "Outputs": [
+                {
+                    "OutputKey": "SatellitePublicHostname",
+                    "OutputValue": "ec2-XXX-XXX-XXX-XXX.ap-southeast-2.compute.amazonaws.com",
+                    "Description": "The DNS Name of the Satellite"
+                }
+            ],
+...
 
 ### Use Satellite public DNS name to access the instance over SSH using your EC2 key
-ssh ec2-user@<EC2PublicHostname>
+ssh ec2-user@ec2-XXX-XXX-XXX-XXX.ap-southeast-2.compute.amazonaws.com
 
-### Use admin/redhat as username/password to access Satellite on https://<EC2PublicHostname>
+### Use admin/redhat as username/password to access Satellite on https:/ec2-XXX-XXX-XXX-XXX.ap-southeast-2.compute.amazonaws.com
 ```
 
 ## How to remove it from AWS
