@@ -68,7 +68,9 @@ You can use AWS CloudFormation Web Console to create stacks by uploading the tem
     "ParameterValue": "My Satellite Subscription Name"
   }
 ]
-# aws cloudformation create-stack --stack-name SATELLITE6DEMO --template-body https://raw.githubusercontent.com/amasolov/satellite6-aws-demo/master/cloudformation/satellite-standalone-capsules.yaml --parameters file://satellite6-aws-demo-parameters.json
+# aws cloudformation create-stack --stack-name SATELLITE6DEMO \
+   --template-body https://raw.githubusercontent.com/amasolov/satellite6-aws-demo/master/cloudformation/satellite-standalone-capsules.yaml \
+   --parameters file://satellite6-aws-demo-parameters.json
 
 {
     "StackId": "arn:aws:cloudformation:ap-southeast-2:291717560534:stack/SATELLITE6DEMO/92b694e0-a6c8-11e9-b61b-0ad4f0e57aba"
@@ -87,7 +89,7 @@ You can use AWS CloudFormation Web Console to create stacks by uploading the tem
 ### Use Satellite public DNS name to access the instance over SSH using your EC2 key
 ssh ec2-user@<EC2PublicHostname>
 
-### Use admin/redhat as username/password to access Satellite WebUI on https://<EC2PublicHostname
+### Use admin/redhat as username/password to access Satellite on https://<EC2PublicHostname>
 ```
 
 ## How to remove it from AWS
