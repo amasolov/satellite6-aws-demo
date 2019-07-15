@@ -1,0 +1,50 @@
+[
+  {
+    "ParameterKey": "RHSMActivationKey",
+    "ParameterValue": "your-activation-key-name"
+  }, 
+  {
+    "ParameterKey": "RHSMOrganization",
+    "ParameterValue": "your-organization-number"
+  }, 
+  {
+    "ParameterKey": "DomainName",
+    "ParameterValue": "desired-domain-name-like-alexeym.demo"
+  },
+  {
+    "ParameterKey": "KeyName",
+    "ParameterValue": "existing-keypair-in-aws-like-redhatkey"
+  },
+  {
+    "ParameterKey": "RHSMUsername",
+    "ParameterValue": "your-rhn-account-name"
+  },
+  {
+    "ParameterKey": "RHSMPassword",
+    "ParameterValue": "your-rhn-account-password"
+  },
+  {
+    "ParameterKey": "AWS_Satellite_EC2Type",
+    "ParameterValue": "r5.large"
+  },
+  {
+    "ParameterKey": "AWS_Capsule_EC2Type",
+    "ParameterValue": "t3.large"
+  },
+  {
+    "ParameterKey": "AWS_AZ",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "RHSM_POOLID",
+    "ParameterValue": "your-subscription-pool-id-to-iclude-into-the-manifest"
+  },
+  {
+    "ParameterKey": "RHSM_POOLQTY",
+    "ParameterValue": "your-subscription-pool-qty-to-iclude-into-the-manifest"
+  },
+  {
+    "ParameterKey": "RHSM_CAPSULE_SUBSCRIPTION_NAME",
+    "ParameterValue": "subscription-name-to-include-into-the-activation-key-for-capsules"
+  }
+]
