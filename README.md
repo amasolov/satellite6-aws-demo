@@ -12,6 +12,14 @@ Set of AWS CloudFormation templates and [Ansible](https://www.redhat.com/en/tech
  - Not using Elastic IPs so don't expect it to work flawlessly after rebooting
 ## Installation and configuration
 
+```
+# aws cloudformation create-stack --stack-name SATELLITE6DEMO --template-body https://raw.githubusercontent.com/amasolov/satellite6-aws-demo/master/cloudformation/satellite-standalone-capsules.yaml --parameters file://satellite6-aws-demo-parameters.json
+
+{
+    "StackId": "arn:aws:cloudformation:ap-southeast-2:291717560534:stack/SATELLITE6DEMO/92b694e0-a6c8-11e9-b61b-0ad4f0e57aba"
+}
+```
+
 ## How to get access
 
 ## How to remove it from AWS
