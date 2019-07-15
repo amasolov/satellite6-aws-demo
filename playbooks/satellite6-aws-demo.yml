@@ -1,0 +1,285 @@
+---
+- hosts: localhost
+  connection: local
+  vars:
+    foreman_host: localhost
+    foreman_port: 443
+    foreman_user: admin
+    foreman_pass: redhat
+    rhsm_user: "{{ lookup('env','rhsm_user') }}"
+    rhsm_pass: "{{ lookup('env','rhsm_pass') }}"
+    domain_name: "{{ lookup('env','domainname') }}"
+    rhsm_poolid: "{{ lookup('env','rhsm_poolid') }}"
+    rhsm_poolqty: "{{ lookup('env','rhsm_poolqty') }}"
+    rhsm_capsule_subscription: "{{ lookup('env','rhsm_capsule_subscription_name') }}"
+  tasks:
+    - name: "Create manifest and add subs"
+      redhat_manifest:
+        name: satellite6-aws-demo
+        username: "{{ rhsm_user }}"
+        password: "{{ rhsm_pass }}"
+        pool_id: "{{ rhsm_poolid }}"
+        quantity: "{{ rhsm_poolqty }}"
+        validate_certs: false
+        state: present
+        path: /root/manifest.zip
+    - name: "Upload the manifest"
+      katello_manifest:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        verify_ssl: false
+        organization: "RHDEMO"
+        state: present
+        manifest_path: "/root/manifest.zip"
+    - name: "Enable rhel-7-server-rpms repository"
+      katello_repository_set:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        organization: "RHDEMO"
+        label: rhel-7-server-rpms
+        repositories:
+        - releasever: "7Server"
+          basearch: "x86_64"
+        state: enabled
+    - name: "Enable rhel-7-server-satellite-capsule-6.5-rpms repository"
+      katello_repository_set:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        organization: "RHDEMO"
+        label: rhel-7-server-satellite-capsule-6.5-rpms
+        repositories:
+        - basearch: "x86_64"
+        state: enabled
+    - name: "Enable rhel-server-rhscl-7-rpms repository"
+      katello_repository_set:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        organization: "RHDEMO"
+        label: rhel-server-rhscl-7-rpms
+        repositories:
+        - basearch: "x86_64"
+        state: enabled
+    - name: "Enable rhel-7-server-satellite-maintenance-6-rpms repository"
+      katello_repository_set:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        organization: "RHDEMO"
+        label: rhel-7-server-satellite-maintenance-6-rpms
+        repositories:
+        - basearch: "x86_64"
+        state: enabled
+    - name: "Enable rhel-7-server-ansible-2.6-rpms repository"
+      katello_repository_set:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        organization: "RHDEMO"
+        label: rhel-7-server-ansible-2.6-rpms
+        repositories:
+        - basearch: "x86_64"
+        state: enabled
+    - name: "Enable rhel-7-server-satellite-tools-6.5-rpms repository"
+      katello_repository_set:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        organization: "RHDEMO"
+        label: rhel-7-server-satellite-tools-6.5-rpms
+        repositories:
+        - basearch: "x86_64"
+        state: enabled
+    - name: "Enable rhel-server-rhscl-7-rpms repository"
+      katello_repository_set:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        organization: "RHDEMO"
+        label: rhel-server-rhscl-7-rpms
+        repositories:
+        - releasever: "7Server"
+          basearch: "x86_64"
+        state: enabled
+    - name: Get all repositories
+      foreman_search_facts:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        resource: repositories
+      register: repositories
+    - name: Kick off repository Sync tasks
+      katello_sync:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        product: "{{ item.product.name }}"
+        repository:  "{{ item.name }}"
+        validate_certs: false
+        organization: "RHDEMO"
+      loop: "{{ repositories.resources }}"
+      when: item.url
+      async: 999999
+      poll: 0
+      register: repo_sync_sleeper
+    - name: Wait until all Syncs have finished
+      async_status:
+        jid: "{{ repo_sync_sleeper_item.ansible_job_id }}"
+      loop: "{{ repo_sync_sleeper.results }}"
+      loop_control:
+        loop_var: repo_sync_sleeper_item
+      when: repo_sync_sleeper_item.ansible_job_id is defined
+      register: async_job_result
+      until: async_job_result.finished
+      retries: 999
+      delay: 10
+    - name: Create BRISBANE Location
+      foreman_location:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        name: "BRISBANE"
+        organizations:
+          - "RHDEMO"
+        state: present
+    - name: Create MELBOURNE Location
+      foreman_location:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        name: "MELBOURNE"
+        organizations:
+          - "RHDEMO"
+        state: present
+    - name: Create CANBERRA Location
+      foreman_location:
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        server_url: "https://{{ foreman_host }}"
+        validate_certs: false
+        name: "CANBERRA"
+        organizations:
+          - "RHDEMO"
+        state: present
+    - name: Create RHDEMO domain
+      foreman_domain:
+        name: "{{ domain_name }}"
+        description: "RHDEMO Domain"
+        locations:
+          - "SYDNEY"
+          - "BRISBANE"
+          - "MELBOURNE"
+          - "CANBERRA"
+        organizations:
+          - "RHDEMO"
+        server_url: "https://{{ foreman_host }}"
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        validate_certs: False
+        state: present
+    - name: Sydney subnet
+      foreman_subnet:
+        name: "Sydney subnet"
+        network: "10.1.1.0"
+        mask: "255.255.255.0"
+        mtu: 1500
+        domains:
+          - "{{ domain_name }}"
+        locations:
+          - "SYDNEY"
+        organizations:
+          - "RHDEMO"
+        server_url: "https://{{ foreman_host }}"
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        validate_certs: False
+        state: present
+    - name: Melbourne subnet
+      foreman_subnet:
+        name: "Melbourne subnet"
+        network: "10.1.10.0"
+        mask: "255.255.255.0"
+        mtu: 1500
+        domains:
+          - "{{ domain_name }}"
+        locations:
+          - "MELBOURNE"
+        organizations:
+          - "RHDEMO"
+        server_url: "https://{{ foreman_host }}"
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        validate_certs: False
+        state: present
+    - name: Canberra subnet
+      foreman_subnet:
+        name: "Canberra subnet"
+        network: "10.1.20.0"
+        mask: "255.255.255.0"
+        mtu: 1500
+        domains:
+          - "{{ domain_name }}"
+        locations:
+          - "CANBERRA"
+        organizations:
+          - "RHDEMO"
+        server_url: "https://{{ foreman_host }}"
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        validate_certs: False
+        state: present
+    - name: Brisbane subnet
+      foreman_subnet:
+        name: "Brisbane subnet"
+        network: "10.1.30.0"
+        mask: "255.255.255.0"
+        mtu: 1500
+        domains:
+          - "{{ domain_name }}"
+        locations:
+          - "BRISBANE"
+        organizations:
+          - "RHDEMO"
+        server_url: "https://{{ foreman_host }}"
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        validate_certs: False
+        state: present
+    - name: "Create CAPSULES activation key"
+      katello_activation_key:
+        server_url: "https://{{ foreman_host }}"
+        username: "{{ foreman_user }}"
+        password: "{{ foreman_pass }}"
+        validate_certs: False
+        state: present
+        name: "CAPSULES"
+        organization: "RHDEMO"
+        lifecycle_environment: "Library"
+        content_view: "Default Organization View"
+        subscriptions:
+          - name: "{{ rhsm_capsule_subscription }}"
+        content_overrides:
+          - label: rhel-7-server-ansible-2.6-rpms
+            override: enabled
+          - label: rhel-server-rhscl-7-rpms
+            override: enabled
+          - label: rhel-7-server-satellite-maintenance-6-rpms
+            override: enabled
+          - label: rhel-7-server-satellite-capsule-6.5-rpms
+            override: enabled
+          - label: rhel-7-server-rpms
+            override: enabled
+        auto_attach: False
