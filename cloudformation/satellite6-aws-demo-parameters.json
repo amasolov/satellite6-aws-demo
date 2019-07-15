@@ -24,27 +24,27 @@
     "ParameterValue": "your-rhn-account-password"
   },
   {
-    "ParameterKey": "AWS_Satellite_EC2Type",
+    "ParameterKey": "AWSSatelliteEC2Type",
     "ParameterValue": "r5.large"
   },
   {
-    "ParameterKey": "AWS_Capsule_EC2Type",
+    "ParameterKey": "AWSCapsuleEC2Type",
     "ParameterValue": "t3.large"
   },
   {
-    "ParameterKey": "AWS_AZ",
+    "ParameterKey": "AWSAZ",
     "ParameterValue": "1"
   },
   {
-    "ParameterKey": "RHSM_POOLID",
+    "ParameterKey": "RHSMPOOLID",
     "ParameterValue": "your-subscription-pool-id-to-iclude-into-the-manifest"
   },
   {
-    "ParameterKey": "RHSM_POOLQTY",
+    "ParameterKey": "RHSMPOOLQTY",
     "ParameterValue": "your-subscription-pool-qty-to-iclude-into-the-manifest"
   },
   {
-    "ParameterKey": "RHSM_CAPSULE_SUBSCRIPTION_NAME",
+    "ParameterKey": "RHSMCAPSULESUBSCRIPTIONNAME",
     "ParameterValue": "subscription-name-to-include-into-the-activation-key-for-capsules"
   }
 ]

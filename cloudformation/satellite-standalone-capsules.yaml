@@ -19,22 +19,22 @@ Parameters:
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
     Description: EC2 Key Pair for SSH access
-  AWS_Satellite_EC2Type:
+  AWSSatelliteEC2Type:
     Type: String
     Description: AWS EC2 Instance Type for Satellite
-  AWS_Capsule_EC2Type:
+  AWSCapsuleEC2Type:
     Type: String
     Description: AWS EC2 Instance Type for Capsules
-  AWS_AZ:
+  AWSAZ:
     Type: String
     Description: AWS Availability Zone number
-  RHSM_POOLID:
+  RHSMPOOLID:
     Type: String
     Description: Subscription Pool ID to include into the manifest
-  RHSM_POOLQTY:
+  RHSMPOOLQTY:
     Type: String
     Description: Amount of subscriptions to include
-  RHSM_CAPSULE_SUBSCRIPTION_NAME:
+  RHSMCAPSULESUBSCRIPTIONNAME:
     Type: String
     Description: Subscription name to use for Capsules
 Outputs:
@@ -290,7 +290,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.1.1.0/24
-      AvailabilityZone: !Select [!Ref AWS_AZ, !GetAZs ]
+      AvailabilityZone: !Select [!Ref AWSAZ, !GetAZs ]
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-Public-A-Main
@@ -299,7 +299,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.1.10.0/24
-      AvailabilityZone: !Select [1, !GetAZs ]
+      AvailabilityZone: !Select [!Ref AWSAZ, !GetAZs ]
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-Public-B-Office1
@@ -308,7 +308,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.1.20.0/24
-      AvailabilityZone: !Select [1, !GetAZs ]
+      AvailabilityZone: !Select [!Ref AWSAZ, !GetAZs ]
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-Public-C-Office2
@@ -317,7 +317,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.1.30.0/24
-      AvailabilityZone: !Select [1, !GetAZs ]
+      AvailabilityZone: !Select [!Ref AWSAZ, !GetAZs ]
       Tags:
         - Key: Name
           Value: !Sub ${AWS::StackName}-Public-D-Office3
@@ -386,7 +386,7 @@ Resources:
     Properties:
       KeyName: !Ref KeyName
       ImageId: !FindInMap [ AWSRegionToAMI, !Ref "AWS::Region", AMI]
-      InstanceType: !Ref AWS_Satellite_EC2Type
+      InstanceType: !Ref AWSSatelliteEC2Type
       NetworkInterfaces:
         - DeviceIndex: '0'
           SubnetId: !Ref PublicSubnetA
@@ -411,9 +411,9 @@ Resources:
           export rhsm_user='${RHSMUsername}'
           export rhsm_pass='${RHSMPassword}'
           export domainname='${DomainName}'
-          export rhsm_poolid='${RHSM_POOLID}'
-          export rhsm_poolqty='${RHSM_POOLQTY}'
-          export rhsm_capsule_subscription_name='${RHSM_CAPSULE_SUBSCRIPTION_NAME}'
+          export rhsm_poolid='${RHSMPOOLID}'
+          export rhsm_poolqty='${RHSMPOOLQTY}'
+          export rhsm_capsule_subscription_name='${RHSMCAPSULESUBSCRIPTIONNAME}'
           hostnamectl set-hostname satellite.${DomainName}
           echo "`curl http://169.254.169.254/latest/meta-data/local-ipv4` satellite.${DomainName} satellite" | sudo tee -a /etc/hosts
           subscription-manager register --activationkey=${RHSMActivationKey} --org=${RHSMOrganization}
@@ -466,7 +466,7 @@ Resources:
     Properties:
       KeyName: !Ref KeyName
       ImageId: !FindInMap [ AWSRegionToAMI, !Ref "AWS::Region", AMI]
-      InstanceType: !Ref AWS_Capsule_EC2Type
+      InstanceType: !Ref AWSCapsuleEC2Type
       NetworkInterfaces:
         - DeviceIndex: '0'
           SubnetId: !Ref PublicSubnetB
@@ -526,7 +526,7 @@ Resources:
     Properties:
       KeyName: !Ref KeyName
       ImageId: !FindInMap [ AWSRegionToAMI, !Ref "AWS::Region", AMI]
-      InstanceType: !Ref AWS_Capsule_EC2Type
+      InstanceType: !Ref AWSCapsuleEC2Type
       NetworkInterfaces:
         - DeviceIndex: '0'
           SubnetId: !Ref PublicSubnetC
@@ -586,7 +586,7 @@ Resources:
     Properties:
       KeyName: !Ref KeyName
       ImageId: !FindInMap [ AWSRegionToAMI, !Ref "AWS::Region", AMI]
-      InstanceType: !Ref AWS_Capsule_EC2Type
+      InstanceType: !Ref AWSCapsuleEC2Type
       NetworkInterfaces:
         - DeviceIndex: '0'
           SubnetId: !Ref PublicSubnetD
