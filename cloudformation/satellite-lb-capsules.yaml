@@ -1,0 +1,661 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  RHSMUsername:
+    Type: String
+    Description: Your RHSM username
+  RHSMPassword:
+    Type: String
+    Description: Your RHSM password
+  RHSMActivationKey:
+    Type: String
+    Description: Your RHSM Activation Key
+  RHSMOrganization:
+    Type: String
+    Description: Your RHSM Organization
+  DomainName:
+    Type: String
+    Description: Domain name to use in the demo
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 Key Pair for SSH access
+  AWSSatelliteEC2Type:
+    Type: String
+    Description: AWS EC2 Instance Type for Satellite
+  AWSCapsuleEC2Type:
+    Type: String
+    Description: AWS EC2 Instance Type for Capsules
+  AWSAZ:
+    Type: String
+    Description: AWS Availability Zone number
+  RHSMPOOLID:
+    Type: String
+    Description: Subscription Pool ID to include into the manifest
+  RHSMPOOLQTY:
+    Type: String
+    Description: Amount of subscriptions to include
+  RHSMCAPSULESUBSCRIPTIONNAME:
+    Type: String
+    Description: Subscription name to use for Capsules
+Outputs:
+  SatellitePublicHostname:
+    Description: The DNS Name of the Satellite
+    Value: !GetAtt SatelliteInstance.PublicDnsName
+Mappings:
+  AWSRegionToAMI:
+    us-east-1:
+      AMI: ami-0f83261cb7d041a1b
+    us-east-2:
+      AMI: ami-0bdf2c4eae6c71d2b
+    us-west-1:
+      AMI: ami-00ef21b27071fe235
+    us-west-2:
+      AMI: ami-0fae471393c00f216
+    eu-west-1:
+      AMI: ami-02a1dcbcc4f50bdb9
+    eu-west-2:
+      AMI: ami-051fb39c3a16c8a85
+    eu-west-3:
+      AMI: ami-0a74212566be8f9e2
+    eu-central-1:
+      AMI: ami-012838bc227c83b03
+    eu-north-1:
+      AMI: ami-3134bc4f
+    sa-east-1:
+      AMI: ami-06addb952810f166b
+    ap-southeast-1:
+      AMI: ami-070467cd1ef12f289
+    ap-southeast-2:
+      AMI: ami-0499d01ff89fea5e6
+    ap-northeast-1:
+      AMI: ami-0b1fa7354371d3331
+    ap-northeast-2:
+      AMI: ami-0983c35dbbdd0f69e
+    ap-south-1:
+      AMI: ami-0656c5f7881490f7a
+    ca-central-1:
+      AMI: ami-0ed2e023e005c9178
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.1.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref "AWS::StackName", "-VPC"]]
+        - Key: Purpose
+          Value: "Red Hat Demo"
+  DNS:
+    Type: "AWS::Route53::HostedZone"
+    DependsOn: VPC
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub "My hosted zone for ${DomainName}"
+      Name: !Ref DomainName
+      VPCs:
+        - VPCId: !Ref VPC
+          VPCRegion: !Ref "AWS::Region"
+  DNSReverseA:
+    Type: "AWS::Route53::HostedZone"
+    DependsOn: VPC
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub "My hosted zone for SubnetA"
+      Name: "1.1.10.in-addr.arpa"
+      VPCs:
+        - VPCId: !Ref VPC
+          VPCRegion: !Ref "AWS::Region"
+  DNSReverseB:
+    Type: "AWS::Route53::HostedZone"
+    DependsOn: VPC
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub "My hosted zone for SubnetB"
+      Name: "10.1.10.in-addr.arpa"
+      VPCs:
+        - VPCId: !Ref VPC
+          VPCRegion: !Ref "AWS::Region"
+  DNSReverseC:
+    Type: "AWS::Route53::HostedZone"
+    DependsOn: VPC
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub "My hosted zone for SubnetC"
+      Name: "20.1.10.in-addr.arpa"
+      VPCs:
+        - VPCId: !Ref VPC
+          VPCRegion: !Ref "AWS::Region"
+  DNSReverseD:
+    Type: "AWS::Route53::HostedZone"
+    DependsOn: VPC
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub "My hosted zone for SubnetD"
+      Name: "30.1.10.in-addr.arpa"
+      VPCs:
+        - VPCId: !Ref VPC
+          VPCRegion: !Ref "AWS::Region"
+  SatelliteDNSRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - SatelliteInstance
+      - DNS
+    Properties:
+      HostedZoneId: !Ref DNS
+      Comment: DNS name for my Satellite instance.
+      Name: !Join ['', ['satellite', ., !Ref DomainName, .]]
+      Type: A
+      TTL: '900'
+      ResourceRecords:
+        - !GetAtt SatelliteInstance.PrivateIp
+  SatelliteReverseDNSRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - SatelliteInstance
+      - DNS
+    Properties:
+      HostedZoneId: !Ref DNSReverseA
+      Comment: DNS name for my Satellite instance.
+      Name: 
+        Fn::Join:
+          - ""
+          -
+            - Fn::Select:
+              - 3
+              - Fn::Split:
+                - "."
+                - !GetAtt SatelliteInstance.PrivateIp
+            - ".1.1.10.in-addr.arpa"        
+      Type: PTR
+      TTL: '900'
+      ResourceRecords:
+        - !Join ['', ['satellite', ., !Ref DomainName, .]]
+  Capsule1DNSRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - Capsule1Instance
+      - DNS
+    Properties:
+      HostedZoneId: !Ref DNS
+      Comment: DNS name for my Capsule1 instance.
+      Name: !Join ['', ['capsule1', ., !Ref DomainName, .]]
+      Type: A
+      TTL: '900'
+      ResourceRecords:
+        - !GetAtt Capsule1Instance.PrivateIp
+  Capsule1ReverseDNSRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - Capsule1Instance
+      - DNS
+    Properties:
+      HostedZoneId: !Ref DNSReverseB
+      Comment: DNS name for my Capsule1 instance.
+      Name: 
+        Fn::Join:
+          - ""
+          -
+            - Fn::Select:
+              - 3
+              - Fn::Split:
+                - "."
+                - !GetAtt Capsule1Instance.PrivateIp
+            - ".10.1.10.in-addr.arpa"        
+      Type: PTR
+      TTL: '900'
+      ResourceRecords:
+        - !Join ['', ['capsule1', ., !Ref DomainName, .]]
+  Capsule2DNSRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - Capsule2Instance
+      - DNS
+    Properties:
+      HostedZoneId: !Ref DNS
+      Comment: DNS name for my Capsule2 instance.
+      Name: !Join ['', ['capsule2', ., !Ref DomainName, .]]
+      Type: A
+      TTL: '900'
+      ResourceRecords:
+        - !GetAtt Capsule2Instance.PrivateIp
+  Capsule2ReverseDNSRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - Capsule2Instance
+      - DNS
+    Properties:
+      HostedZoneId: !Ref DNSReverseC
+      Comment: DNS name for my Capsule1 instance.
+      Name: 
+        Fn::Join:
+          - ""
+          -
+            - Fn::Select:
+              - 3
+              - Fn::Split:
+                - "."
+                - !GetAtt Capsule2Instance.PrivateIp
+            - ".20.1.10.in-addr.arpa"        
+      Type: PTR
+      TTL: '900'
+      ResourceRecords:
+        - !Join ['', ['capsule2', ., !Ref DomainName, .]]
+  Capsule3DNSRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - Capsule3Instance
+      - DNS
+    Properties:
+      HostedZoneId: !Ref DNS
+      Comment: DNS name for my Capsule2 instance.
+      Name: !Join ['', ['capsule3', ., !Ref DomainName, .]]
+      Type: A
+      TTL: '900'
+      ResourceRecords:
+        - !GetAtt Capsule3Instance.PrivateIp
+  Capsule3ReverseDNSRecord:
+    Type: AWS::Route53::RecordSet
+    DependsOn:
+      - Capsule3Instance
+      - DNS
+    Properties:
+      HostedZoneId: !Ref DNSReverseD
+      Comment: DNS name for my Capsule3 instance.
+      Name: 
+        Fn::Join:
+          - ""
+          -
+            - Fn::Select:
+              - 3
+              - Fn::Split:
+                - "."
+                - !GetAtt Capsule3Instance.PrivateIp
+            - ".30.1.10.in-addr.arpa"        
+      Type: PTR
+      TTL: '900'
+      ResourceRecords:
+        - !Join ['', ['capsule3', ., !Ref DomainName, .]]
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: VPC
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.1.1.0/24
+      AvailabilityZone: !Select [!Ref AWSAZ, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Public-A-Main
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.1.10.0/24
+      AvailabilityZone: !Select [!Ref AWSAZ, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Public-B-Office1
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.1.20.0/24
+      AvailabilityZone: !Select [!Ref AWSAZ, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Public-C-Office2
+  PublicSubnetD:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.1.30.0/24
+      AvailabilityZone: !Select [!Ref AWSAZ, !GetAZs ]
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-Public-D-Office3
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Public
+  PublicRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetDRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetD
+      RouteTableId: !Ref PublicRouteTable
+  DefaultSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: AttachGateway
+    Properties:
+      GroupName: !Sub DefaultSecurityGroup-${AWS::StackName}
+      GroupDescription: Enable external access
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: 0.0.0.0/0
+  SatelliteInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: PublicRoute1
+    Properties:
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap [ AWSRegionToAMI, !Ref "AWS::Region", AMI]
+      InstanceType: !Ref AWSSatelliteEC2Type
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          SubnetId: !Ref PublicSubnetA
+          AssociatePublicIpAddress: true
+          GroupSet: [!Ref DefaultSecurityGroup]
+      Tags:
+        - Key: Name
+          Value: !Sub Satellite-${AWS::StackName}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm -y
+          yum install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.amzn1.noarch.rpm -y
+          ln -s /usr/local/lib/python2.7/site-packages/cfnbootstrap /usr/lib/python2.7/site-packages/cfnbootstrap
+          yum -y remove rh-amazon-rhui-client*
+          yum -y remove epel-release
+          yum clean all
+          cat << EOF > /etc/yum/pluginconf.d/product-id.conf
+          [main]
+          enabled=1
+          EOF
+          export rhsm_user='${RHSMUsername}'
+          export rhsm_pass='${RHSMPassword}'
+          export domainname='${DomainName}'
+          export rhsm_poolid='${RHSMPOOLID}'
+          export rhsm_poolqty='${RHSMPOOLQTY}'
+          export rhsm_capsule_subscription_name='${RHSMCAPSULESUBSCRIPTIONNAME}'
+          hostnamectl set-hostname satellite.${DomainName}
+          echo "`curl http://169.254.169.254/latest/meta-data/local-ipv4` satellite.${DomainName} satellite" | sudo tee -a /etc/hosts
+          subscription-manager register --activationkey=${RHSMActivationKey} --org=${RHSMOrganization}
+          subscription-manager repos --disable=*
+          subscription-manager repos --enable=rhel-7-server-rpms \
+            --enable=rhel-server-rhscl-7-rpms \
+            --enable=rhel-7-server-satellite-6.5-rpms \
+            --enable=rhel-7-server-satellite-maintenance-6-rpms \
+            --enable=rhel-7-server-ansible-2.6-rpms
+          yum -y update
+          systemctl disable firewalld
+          systemctl stop firewalld
+          yum -y install satellite
+          satellite-installer --scenario satellite --foreman-initial-organization "RHDEMO" --foreman-initial-location "SYDNEY" --foreman-admin-password redhat
+          capsule-certs-generate --foreman-proxy-fqdn capsule1.${DomainName} --certs-tar "/var/www/html/pub/capsule1-certs.tar" --foreman-proxy-cname loadbalancer.${DomainName}
+          capsule-certs-generate --foreman-proxy-fqdn capsule2.${DomainName} --certs-tar "/var/www/html/pub/capsule2-certs.tar" --foreman-proxy-cname loadbalancer.${DomainName
+          capsule-certs-generate --foreman-proxy-fqdn capsule3.${DomainName} --certs-tar "/var/www/html/pub/capsule3-certs.tar" --foreman-proxy-cname loadbalancer.${DomainName
+          cat /etc/foreman/settings.yaml | grep oauth_consumer_key | awk {'print $2'} > /var/www/html/pub/oauth_consumer_key
+          cat /etc/foreman/settings.yaml | grep oauth_consumer_secret | awk {'print $2'} > /var/www/html/pub/oauth_consumer_secret
+          mkdir -p /root/infra/{playbooks,roles}
+          cd /root/infra
+          git clone https://github.com/theforeman/foreman-ansible-modules.git
+          wget https://raw.githubusercontent.com/amasolov/satellite6-aws-demo/master/playbooks/satellite6-aws-demo.yml -O foreman.yml
+          cat << EOF > /root/infra/ansible.cfg
+          [defaults]
+          library = foreman-ansible-modules/plugins/modules
+          module_utils = foreman-ansible-modules/plugins/module_utils
+          inventory = test/inventory/hosts
+          retry_files_enabled = False
+          EOF
+          yum install -y python27-python-pip.noarch
+          scl enable python27 'pip install --user nailgun'
+          scl enable python27 'pip install --user apypie'
+          scl enable python27 'pip install --user netaddr'
+          scl enable python27 'ansible-playbook foreman.yml'
+          unset rhsm_user
+          unset rhsm_pass
+          unset domainname
+          unset rhsm_poolid
+          unset rhsm_poolqty
+          unset rhsm_capsule_subscription_name
+          /opt/aws/bin/cfn-signal -e 0 --resource SatelliteInstance --stack ${AWS::StackName} --region ${AWS::Region}
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT180M
+  Capsule1Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: SatelliteInstance
+    Properties:
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap [ AWSRegionToAMI, !Ref "AWS::Region", AMI]
+      InstanceType: !Ref AWSCapsuleEC2Type
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          SubnetId: !Ref PublicSubnetB
+          AssociatePublicIpAddress: true
+          GroupSet: [!Ref DefaultSecurityGroup]
+      Tags:
+        - Key: Name
+          Value: !Sub Capsule1-${AWS::StackName}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm -y
+          yum install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.amzn1.noarch.rpm -y
+          ln -s /usr/local/lib/python2.7/site-packages/cfnbootstrap /usr/lib/python2.7/site-packages/cfnbootstrap
+          yum -y remove rh-amazon-rhui-client*
+          yum -y remove epel-release
+          yum clean all
+          cat << EOF > /etc/yum/pluginconf.d/product-id.conf
+          [main]
+          enabled=1
+          EOF
+          hostnamectl set-hostname capsule1.${DomainName}
+          echo "`curl http://169.254.169.254/latest/meta-data/local-ipv4` capsule1.${DomainName} capsule1" | sudo tee -a /etc/hosts
+          rpm -ihv http://satellite.${DomainName}/pub/katello-ca-consumer-latest.noarch.rpm
+          subscription-manager register --activationkey=CAPSULES --org=RHDEMO
+          subscription-manager repos --disable=*
+          subscription-manager repos --enable=rhel-7-server-rpms \
+            --enable=rhel-server-rhscl-7-rpms \
+            --enable=rhel-7-server-satellite-capsule-6.5-rpms \
+            --enable=rhel-7-server-satellite-maintenance-6-rpms \
+            --enable=rhel-7-server-ansible-2.6-rpms
+          yum -y update
+          systemctl disable firewalld
+          systemctl stop firewalld
+          /opt/aws/bin/cfn-signal -e 0 --resource Capsule1Instance --stack ${AWS::StackName} --region ${AWS::Region}
+          yum -y install satellite-capsule
+          yum -y install --enablerepo=rhel-7-server-satellite-tools-6.5-rpms tfm-rubygem-hammer_*
+          wget -O /root/capsule-certs.tar http://satellite.${DomainName}/pub/capsule1-certs.tar
+          satellite-installer --scenario capsule \
+            --foreman-proxy-content-parent-fqdn satellite.${DomainName} \
+            --foreman-proxy-register-in-foreman true \
+            --foreman-proxy-foreman-base-url https://satellite.${DomainName} \
+            --foreman-proxy-trusted-hosts satellite.${DomainName} \
+            --foreman-proxy-trusted-hosts capsule1.${DomainName} \
+            --foreman-proxy-oauth-consumer-key `curl http://satellite.${DomainName}/pub/oauth_consumer_key` \
+            --foreman-proxy-oauth-consumer-secret `curl http://satellite.${DomainName}/pub/oauth_consumer_secret` \
+            --foreman-proxy-content-certs-tar /root/capsule-certs.tar \
+            --puppet-server-foreman-url "https://satellite.${DomainName}" \
+            --certs-cname                              "loadbalancer.${DomainName}" \
+            --puppet-dns-alt-names                     "loadbalancer.${DomainName}" \
+            --puppet-ca-server                         "capsule1.${DomainName}" \
+            --foreman-proxy-puppetca                   "true" \
+            --puppet-server-ca                         "true" \
+            --enable-foreman-proxy-plugin-remote-execution-ssh        
+          HOME=/root hammer -u admin -p redhat -s https://satellite.${DomainName} capsule update --name capsule1.${DomainName} --organization-titles RHDEMO --locations MELBOURNE
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT180M
+  Capsule2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: SatelliteInstance
+    Properties:
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap [ AWSRegionToAMI, !Ref "AWS::Region", AMI]
+      InstanceType: !Ref AWSCapsuleEC2Type
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          SubnetId: !Ref PublicSubnetC
+          AssociatePublicIpAddress: true
+          GroupSet: [!Ref DefaultSecurityGroup]
+      Tags:
+        - Key: Name
+          Value: !Sub Capsule2-${AWS::StackName}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm -y
+          yum install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.amzn1.noarch.rpm -y
+          ln -s /usr/local/lib/python2.7/site-packages/cfnbootstrap /usr/lib/python2.7/site-packages/cfnbootstrap
+          yum -y remove rh-amazon-rhui-client*
+          yum -y remove epel-release
+          yum clean all
+          cat << EOF > /etc/yum/pluginconf.d/product-id.conf
+          [main]
+          enabled=1
+          EOF
+          hostnamectl set-hostname capsule2.${DomainName}
+          echo "`curl http://169.254.169.254/latest/meta-data/local-ipv4` capsule2.${DomainName} capsule2" | sudo tee -a /etc/hosts
+          rpm -ihv http://satellite.${DomainName}/pub/katello-ca-consumer-latest.noarch.rpm
+          subscription-manager register --activationkey=CAPSULES --org=RHDEMO
+          subscription-manager repos --disable=*
+          subscription-manager repos --enable=rhel-7-server-rpms \
+            --enable=rhel-server-rhscl-7-rpms \
+            --enable=rhel-7-server-satellite-capsule-6.5-rpms \
+            --enable=rhel-7-server-satellite-maintenance-6-rpms \
+            --enable=rhel-7-server-ansible-2.6-rpms
+          yum -y update
+          systemctl disable firewalld
+          systemctl stop firewalld
+          /opt/aws/bin/cfn-signal -e 0 --resource Capsule2Instance --stack ${AWS::StackName} --region ${AWS::Region}
+          yum -y install satellite-capsule
+          yum -y install --enablerepo=rhel-7-server-satellite-tools-6.5-rpms tfm-rubygem-hammer_*
+          wget -O /root/capsule-certs.tar http://satellite.${DomainName}/pub/capsule2-certs.tar
+          satellite-installer --scenario capsule \
+            --foreman-proxy-content-parent-fqdn satellite.${DomainName} \
+            --foreman-proxy-register-in-foreman true \
+            --foreman-proxy-foreman-base-url https://satellite.${DomainName} \
+            --foreman-proxy-trusted-hosts satellite.${DomainName} \
+            --foreman-proxy-trusted-hosts capsule2.${DomainName} \
+            --foreman-proxy-oauth-consumer-key `curl http://satellite.${DomainName}/pub/oauth_consumer_key` \
+            --foreman-proxy-oauth-consumer-secret `curl http://satellite.${DomainName}/pub/oauth_consumer_secret` \
+            --foreman-proxy-content-certs-tar /root/capsule-certs.tar \
+            --puppet-server-foreman-url "https://satellite.${DomainName}" \
+            --certs-cname                              "loadbalancer.${DomainName}" \
+            --puppet-dns-alt-names                     "loadbalancer.${DomainName}" \
+            --puppet-ca-server                         "capsule2.${DomainName}" \
+            --foreman-proxy-puppetca                   "true" \
+            --puppet-server-ca                         "true" \
+            --enable-foreman-proxy-plugin-remote-execution-ssh              
+          HOME=/root hammer -u admin -p redhat -s https://satellite.${DomainName} capsule update --name capsule2.${DomainName} --organization-titles RHDEMO --locations CANBERRA
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT180M
+  Capsule3Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: SatelliteInstance
+    Properties:
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap [ AWSRegionToAMI, !Ref "AWS::Region", AMI]
+      InstanceType: !Ref AWSCapsuleEC2Type
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          SubnetId: !Ref PublicSubnetD
+          AssociatePublicIpAddress: true
+          GroupSet: [!Ref DefaultSecurityGroup]
+      Tags:
+        - Key: Name
+          Value: !Sub Capsule3-${AWS::StackName}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm -y
+          yum install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.amzn1.noarch.rpm -y
+          ln -s /usr/local/lib/python2.7/site-packages/cfnbootstrap /usr/lib/python2.7/site-packages/cfnbootstrap
+          yum -y remove rh-amazon-rhui-client*
+          yum -y remove epel-release
+          yum clean all
+          cat << EOF > /etc/yum/pluginconf.d/product-id.conf
+          [main]
+          enabled=1
+          EOF
+          hostnamectl set-hostname capsule3.${DomainName}
+          echo "`curl http://169.254.169.254/latest/meta-data/local-ipv4` capsule3.${DomainName} capsule3" | sudo tee -a /etc/hosts
+          rpm -ihv http://satellite.${DomainName}/pub/katello-ca-consumer-latest.noarch.rpm
+          subscription-manager register --activationkey=CAPSULES --org=RHDEMO
+          subscription-manager repos --disable=*
+          subscription-manager repos --enable=rhel-7-server-rpms \
+            --enable=rhel-server-rhscl-7-rpms \
+            --enable=rhel-7-server-satellite-capsule-6.5-rpms \
+            --enable=rhel-7-server-satellite-maintenance-6-rpms \
+            --enable=rhel-7-server-ansible-2.6-rpms
+          yum -y update
+          systemctl disable firewalld
+          systemctl stop firewalld
+          /opt/aws/bin/cfn-signal -e 0 --resource Capsule3Instance --stack ${AWS::StackName} --region ${AWS::Region}
+          yum -y install satellite-capsule
+          yum -y install --enablerepo=rhel-7-server-satellite-tools-6.5-rpms tfm-rubygem-hammer_*
+          wget -O /root/capsule-certs.tar http://satellite.${DomainName}/pub/capsule3-certs.tar
+          satellite-installer --scenario capsule \
+            --foreman-proxy-content-parent-fqdn satellite.${DomainName} \
+            --foreman-proxy-register-in-foreman true \
+            --foreman-proxy-foreman-base-url https://satellite.${DomainName} \
+            --foreman-proxy-trusted-hosts satellite.${DomainName} \
+            --foreman-proxy-trusted-hosts capsule3.${DomainName} \
+            --foreman-proxy-oauth-consumer-key `curl http://satellite.${DomainName}/pub/oauth_consumer_key` \
+            --foreman-proxy-oauth-consumer-secret `curl http://satellite.${DomainName}/pub/oauth_consumer_secret` \
+            --foreman-proxy-content-certs-tar /root/capsule-certs.tar \
+            --puppet-server-foreman-url "https://satellite.${DomainName}" \
+            --certs-cname                              "loadbalancer.${DomainName}" \
+            --puppet-dns-alt-names                     "loadbalancer.${DomainName}" \
+            --puppet-ca-server                         "capsule3.${DomainName}" \
+            --foreman-proxy-puppetca                   "true" \
+            --puppet-server-ca                         "true" \
+            --enable-foreman-proxy-plugin-remote-execution-ssh              
+          HOME=/root hammer -u admin -p redhat -s https://satellite.${DomainName} capsule update --name capsule3.${DomainName} --organization-titles RHDEMO --locations BRISBANE
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT180M
+        
